@@ -21,9 +21,8 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  require-main:
     runs-on: ubuntu-latest
-
     steps:
       - name: Require main
         env:
@@ -34,6 +33,18 @@ jobs:
             exit 1
           fi
 
+  build:
+    needs: require-main
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ inputs.branch || github.ref }}
+    secrets: inherit
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Check out ${{ inputs.branch || github.ref_name }}
         uses: actions/checkout@v4
         with:
