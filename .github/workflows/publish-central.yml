@@ -1,0 +1,80 @@
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to publish (defaults to the branch selected above)'
+        required: false
+        type: string
+      version:
+        description: 'Version to publish, e.g. 1.0.0 (defaults to the version in pom.xml)'
+        required: false
+        type: string
+      skip-tests:
+        description: 'Skip tests'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require main
+        env:
+          BRANCH: ${{ inputs.branch || github.ref_name }}
+        run: |
+          if [ "$BRANCH" != "main" ]; then
+            echo "::error::Publishing to Maven Central is only allowed from main (got '$BRANCH')."
+            exit 1
+          fi
+
+      - name: Check out ${{ inputs.branch || github.ref_name }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          server-id: central
+          server-username: CENTRAL_TOKEN_USERNAME
+          server-password: CENTRAL_TOKEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
+
+      - name: Set version
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: >
+          mvn -B -ntp versions:set
+          -DnewVersion="$VERSION"
+          -DprocessAllModules
+          -DgenerateBackupPoms=false
+
+      - name: Deploy to Maven Central
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          SKIP_TESTS: ${{ inputs.skip-tests }}
+        run: mvn -B -ntp -Pcentral-publish -DskipTests="$SKIP_TESTS" deploy
+
+      - name: Summary
+        run: |
+          {
+            echo "Submitted \`$(mvn -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)\`"
+            echo "from branch \`${BRANCH}\` to the Sonatype Central Publishing Portal."
+            echo "It requires manual review/release at https://central.sonatype.com/publishing/deployments"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          BRANCH: ${{ inputs.branch || github.ref_name }}
