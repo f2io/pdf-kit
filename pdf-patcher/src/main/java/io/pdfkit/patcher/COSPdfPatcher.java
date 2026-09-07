@@ -14,6 +14,7 @@ import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSString;
+import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -34,7 +35,8 @@ public class COSPdfPatcher implements PlaceholderPatcher {
 
   @Override
   public void patchText(Path input, Path output, Map<String, String> values) throws IOException {
-    try (PDDocument document = Loader.loadPDF(input.toFile())) {
+    try (PDDocument document =
+        Loader.loadPDF(input.toFile(), IOUtils.createTempFileOnlyStreamCache())) {
       for (PDPage page : document.getPages()) {
         patchPage(document, page, values);
       }

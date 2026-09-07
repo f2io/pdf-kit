@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
@@ -23,7 +24,8 @@ public class AcroFormPdfFinder implements PlaceholderFinder {
 
   @Override
   public List<Placeholder> findPlaceholders(Path pdf) throws IOException {
-    try (PDDocument document = Loader.loadPDF(pdf.toFile())) {
+    try (PDDocument document =
+        Loader.loadPDF(pdf.toFile(), IOUtils.createTempFileOnlyStreamCache())) {
       List<Placeholder> placeholders = new ArrayList<>();
       PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
       if (acroForm == null) {

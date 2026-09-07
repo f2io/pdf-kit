@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import org.apache.pdfbox.pdmodel.interactive.form.PDField;
@@ -20,7 +21,8 @@ public class AcroFormPdfPatcher implements PlaceholderPatcher {
 
   @Override
   public void patchText(Path input, Path output, Map<String, String> values) throws IOException {
-    try (PDDocument document = Loader.loadPDF(input.toFile())) {
+    try (PDDocument document =
+        Loader.loadPDF(input.toFile(), IOUtils.createTempFileOnlyStreamCache())) {
       PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
       if (acroForm != null) {
         for (PDField field : acroForm.getFieldTree()) {

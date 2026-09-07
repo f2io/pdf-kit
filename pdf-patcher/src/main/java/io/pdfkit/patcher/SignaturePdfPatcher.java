@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -31,7 +32,8 @@ public class SignaturePdfPatcher implements PlaceholderImagePatcher {
 
   @Override
   public void patchImage(Path input, Path output, Map<String, Path> images) throws IOException {
-    try (PDDocument document = Loader.loadPDF(input.toFile())) {
+    try (PDDocument document =
+        Loader.loadPDF(input.toFile(), IOUtils.createTempFileOnlyStreamCache())) {
       PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
       if (acroForm != null) {
         for (PDField field : acroForm.getFieldTree()) {

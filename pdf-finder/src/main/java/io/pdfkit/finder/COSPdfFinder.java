@@ -12,6 +12,7 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSString;
+import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -28,7 +29,8 @@ public class COSPdfFinder implements PlaceholderFinder {
 
   @Override
   public List<Placeholder> findPlaceholders(Path pdf) throws IOException {
-    try (PDDocument document = Loader.loadPDF(pdf.toFile())) {
+    try (PDDocument document =
+        Loader.loadPDF(pdf.toFile(), IOUtils.createTempFileOnlyStreamCache())) {
       List<Placeholder> placeholders = new ArrayList<>();
       int pageNumber = 0;
       for (PDPage page : document.getPages()) {
