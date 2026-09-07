@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.pdfkit</groupId>
+    <groupId>io.github.f2io</groupId>
     <artifactId>pdf-kit</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -12,6 +12,33 @@
         <module>pdf-finder</module>
         <module>pdf-patcher</module>
     </modules>
+
+    <name>pdf-kit</name>
+    <description>Finds and patches placeholders in PDFs.</description>
+    <url>https://github.com/f2io/pdf-kit</url>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>f2io</id>
+            <name>f2io</name>
+            <email>f2io.monteiro@gmail.com</email>
+            <url>https://github.com/f2io</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/f2io/pdf-kit.git</connection>
+        <developerConnection>scm:git:git@github.com:f2io/pdf-kit.git</developerConnection>
+        <url>https://github.com/f2io/pdf-kit</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -31,5 +58,95 @@
             <url>https://maven.pkg.github.com/f2io/pdf-kit</url>
         </snapshotRepository>
     </distributionManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.44.3</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Signs, bundles sources/javadoc, and publishes to Maven Central via
+             the Sonatype Central Publishing Portal. Activate explicitly with
+             -Pcentral-publish; it skips the default GitHub Packages deploy so
+             the two targets don't collide on the same `deploy` phase. -->
+        <profile>
+            <id>central-publish</id>
+            <properties>
+                <maven.deploy.skip>true</maven.deploy.skip>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.2</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
