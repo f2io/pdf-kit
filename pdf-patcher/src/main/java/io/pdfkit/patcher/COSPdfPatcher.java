@@ -12,16 +12,21 @@ import java.util.regex.Pattern;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSBase;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSString;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDStream;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 
 /**
- * Replaces placeholders drawn as page content-stream text (Tj/TJ runs) - blind to placeholders
- * living only inside AcroForm field values, which is AcroFormPdfPatcher's job.
+ * Replaces placeholders drawn as page content-stream text (Tj/TJ runs), including text nested
+ * inside Form XObjects (recursively) - blind to placeholders living only inside AcroForm field
+ * values, which is AcroFormPdfPatcher's job.
  */
 public class COSPdfPatcher implements PlaceholderPatcher {
 
@@ -40,14 +45,7 @@ public class COSPdfPatcher implements PlaceholderPatcher {
   private void patchPage(PDDocument document, PDPage page, Map<String, String> values)
       throws IOException {
     List<Object> tokens = new PDFStreamParser(page).parse();
-    for (int i = 0; i < tokens.size(); i++) {
-      Object token = tokens.get(i);
-      if (token instanceof COSString cosString) {
-        tokens.set(i, patchString(cosString, values));
-      } else if (token instanceof COSArray array) {
-        patchArray(array, values);
-      }
-    }
+    patchTokens(tokens, values);
 
     ByteArrayOutputStream contentBytes = new ByteArrayOutputStream();
     new ContentStreamWriter(contentBytes).writeTokens(tokens);
@@ -57,6 +55,45 @@ public class COSPdfPatcher implements PlaceholderPatcher {
       out.write(contentBytes.toByteArray());
     }
     page.setContents(newContents);
+
+    patchXObjects(page.getResources(), values);
+  }
+
+  private void patchXObjects(PDResources resources, Map<String, String> values) throws IOException {
+    if (resources == null) {
+      return;
+    }
+    for (COSName name : resources.getXObjectNames()) {
+      PDXObject xObject = resources.getXObject(name);
+      if (xObject instanceof PDFormXObject formXObject) {
+        patchFormXObject(formXObject, values);
+        patchXObjects(formXObject.getResources(), values);
+      }
+    }
+  }
+
+  private void patchFormXObject(PDFormXObject formXObject, Map<String, String> values)
+      throws IOException {
+    List<Object> tokens = new PDFStreamParser(formXObject).parse();
+    patchTokens(tokens, values);
+
+    ByteArrayOutputStream contentBytes = new ByteArrayOutputStream();
+    new ContentStreamWriter(contentBytes).writeTokens(tokens);
+
+    try (OutputStream out = formXObject.getCOSObject().createOutputStream()) {
+      out.write(contentBytes.toByteArray());
+    }
+  }
+
+  private void patchTokens(List<Object> tokens, Map<String, String> values) {
+    for (int i = 0; i < tokens.size(); i++) {
+      Object token = tokens.get(i);
+      if (token instanceof COSString cosString) {
+        tokens.set(i, patchString(cosString, values));
+      } else if (token instanceof COSArray array) {
+        patchArray(array, values);
+      }
+    }
   }
 
   private void patchArray(COSArray array, Map<String, String> values) {

@@ -10,15 +10,18 @@ import java.nio.file.Paths;
 import java.util.List;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDFormContentStream;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import org.apache.pdfbox.pdmodel.interactive.form.PDTextField;
+import org.apache.pdfbox.util.Matrix;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -154,6 +157,46 @@ class COSPdfFinderTest {
     List<Placeholder> placeholders = new COSPdfFinder().findPlaceholders(pdf);
 
     assertEquals(List.of(new Placeholder("date", 1)), placeholders);
+  }
+
+  @Test
+  void findsPlaceholderDrawnInsideFormXObject(@TempDir Path tempDir) throws IOException {
+    // Some PDF generators (e.g. templating tools, reused letterhead/logo blocks)
+    // draw text via a Form XObject rather than directly in the page's content
+    // stream. COSPdfFinder must recurse into Form XObjects to find that text too.
+    Path pdf = tempDir.resolve("form-xobject.pdf");
+    writeFormXObjectPdf(pdf, "Hello ${name}, welcome.");
+
+    List<Placeholder> placeholders = new COSPdfFinder().findPlaceholders(pdf);
+
+    assertEquals(List.of(new Placeholder("name", 1)), placeholders);
+  }
+
+  private void writeFormXObjectPdf(Path path, String textInForm) throws IOException {
+    try (PDDocument document = new PDDocument()) {
+      PDPage page = new PDPage();
+      document.addPage(page);
+
+      PDFormXObject form = new PDFormXObject(document);
+      form.setBBox(new PDRectangle(200, 50));
+      form.setResources(new PDResources());
+      try (PDFormContentStream formStream = new PDFormContentStream(form)) {
+        formStream.beginText();
+        formStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+        formStream.newLineAtOffset(0, 0);
+        formStream.showText(textInForm);
+        formStream.endText();
+      }
+
+      try (PDPageContentStream stream = new PDPageContentStream(document, page)) {
+        stream.saveGraphicsState();
+        stream.transform(Matrix.getTranslateInstance(50, 700));
+        stream.drawForm(form);
+        stream.restoreGraphicsState();
+      }
+
+      document.save(path.toFile());
+    }
   }
 
   private void writeAcroFormPdf(Path path, String staticText, String fieldName, String fieldValue)

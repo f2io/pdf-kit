@@ -10,14 +10,19 @@ import java.util.List;
 import java.util.regex.Matcher;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSArray;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSString;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 
 /**
- * Finds placeholders drawn as page content-stream text (Tj/TJ runs) - blind to placeholders living
- * only inside AcroForm field values, which is AcroFormPdfFinder's job.
+ * Finds placeholders drawn as page content-stream text (Tj/TJ runs), including text nested inside
+ * Form XObjects (recursively) - blind to placeholders living only inside AcroForm field values,
+ * which is AcroFormPdfFinder's job.
  */
 public class COSPdfFinder implements PlaceholderFinder {
 
@@ -36,7 +41,28 @@ public class COSPdfFinder implements PlaceholderFinder {
 
   private List<Placeholder> findPlaceholdersOnPage(PDPage page, int pageNumber) throws IOException {
     List<Placeholder> placeholders = new ArrayList<>();
-    for (Object token : new PDFStreamParser(page).parse()) {
+    collectFromTokens(new PDFStreamParser(page).parse(), pageNumber, placeholders);
+    collectFromXObjects(page.getResources(), pageNumber, placeholders);
+    return placeholders;
+  }
+
+  private void collectFromXObjects(
+      PDResources resources, int pageNumber, List<Placeholder> placeholders) throws IOException {
+    if (resources == null) {
+      return;
+    }
+    for (COSName name : resources.getXObjectNames()) {
+      PDXObject xObject = resources.getXObject(name);
+      if (xObject instanceof PDFormXObject formXObject) {
+        collectFromTokens(new PDFStreamParser(formXObject).parse(), pageNumber, placeholders);
+        collectFromXObjects(formXObject.getResources(), pageNumber, placeholders);
+      }
+    }
+  }
+
+  private void collectFromTokens(
+      List<Object> tokens, int pageNumber, List<Placeholder> placeholders) {
+    for (Object token : tokens) {
       if (token instanceof COSString cosString) {
         collect(cosString, pageNumber, placeholders);
       } else if (token instanceof COSArray array) {
@@ -47,7 +73,6 @@ public class COSPdfFinder implements PlaceholderFinder {
         }
       }
     }
-    return placeholders;
   }
 
   private void collect(COSString cosString, int pageNumber, List<Placeholder> placeholders) {

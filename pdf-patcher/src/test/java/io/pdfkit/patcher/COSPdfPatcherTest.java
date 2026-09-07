@@ -4,6 +4,7 @@ import static io.pdfkit.patcher.TestPdfs.readFieldValue;
 import static io.pdfkit.patcher.TestPdfs.readText;
 import static io.pdfkit.patcher.TestPdfs.tmpOutput;
 import static io.pdfkit.patcher.TestPdfs.writeAcroFormPdf;
+import static io.pdfkit.patcher.TestPdfs.writeFormXObjectPdf;
 import static io.pdfkit.patcher.TestPdfs.writeSamplePdf;
 import static io.pdfkit.patcher.TestPdfs.writeSplitRunPdf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -116,5 +117,19 @@ class COSPdfPatcherTest {
 
     assertEquals("Prepared on 2026-09-06", readText(output).trim());
     assertEquals("${customerName}", readFieldValue(output, "customerName"));
+  }
+
+  @Test
+  void patchesPlaceholderDrawnInsideFormXObject(@TempDir Path tempDir) throws IOException {
+    // Some PDF generators (e.g. templating tools, reused letterhead/logo blocks)
+    // draw text via a Form XObject rather than directly in the page's content
+    // stream. COSPdfPatcher must recurse into Form XObjects to patch that text too.
+    Path syntheticInput = tempDir.resolve("input.pdf");
+    Path output = tmpOutput("patches-placeholder-inside-form-xobject.pdf");
+    writeFormXObjectPdf(syntheticInput, "Hello ${name}, welcome.");
+
+    new COSPdfPatcher().patchText(syntheticInput, output, Map.of("name", "Alice"));
+
+    assertEquals("Hello Alice, welcome.", readText(output).trim());
   }
 }

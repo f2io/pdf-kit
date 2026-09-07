@@ -13,17 +13,20 @@ import javax.imageio.ImageIO;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDFormContentStream;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import org.apache.pdfbox.pdmodel.interactive.form.PDField;
 import org.apache.pdfbox.pdmodel.interactive.form.PDTextField;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.util.Matrix;
 
 /**
  * Shared PDF fixtures and readers for the PdfPatcher test classes: synthetic, single-purpose PDFs
@@ -139,6 +142,33 @@ final class TestPdfs {
       page.getAnnotations().add(widget);
 
       field.setValue(fieldValue);
+
+      document.save(path.toFile());
+    }
+  }
+
+  static void writeFormXObjectPdf(Path path, String textInForm) throws IOException {
+    try (PDDocument document = new PDDocument()) {
+      PDPage page = new PDPage();
+      document.addPage(page);
+
+      PDFormXObject form = new PDFormXObject(document);
+      form.setBBox(new PDRectangle(200, 50));
+      form.setResources(new PDResources());
+      try (PDFormContentStream formStream = new PDFormContentStream(form)) {
+        formStream.beginText();
+        formStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+        formStream.newLineAtOffset(0, 0);
+        formStream.showText(textInForm);
+        formStream.endText();
+      }
+
+      try (PDPageContentStream stream = new PDPageContentStream(document, page)) {
+        stream.saveGraphicsState();
+        stream.transform(Matrix.getTranslateInstance(50, 700));
+        stream.drawForm(form);
+        stream.restoreGraphicsState();
+      }
 
       document.save(path.toFile());
     }
